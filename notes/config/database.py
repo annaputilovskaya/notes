@@ -2,7 +2,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import DeclarativeBase, declared_attr
+from sqlalchemy.orm import DeclarativeBase, declared_attr, Mapped, mapped_column
 
 from config.config import settings
 
@@ -53,6 +53,8 @@ class Base(DeclarativeBase):
     metadata = MetaData(
         naming_convention=settings.db.naming_convention,
     )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
 
     @declared_attr.directive
     def __tablename__(cls) -> str:
