@@ -1,27 +1,25 @@
 from typing import AsyncGenerator
 
-from sqlalchemy import MetaData
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import DeclarativeBase, declared_attr, Mapped, mapped_column
-
-from config.config import settings
+from core.config import settings
+from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession,
+                                    async_sessionmaker, create_async_engine)
 
 
 class DatabaseHelper:
     def __init__(
-            self,
-            url: str,
-            echo: bool = False,
-            echo_pool: bool = False,
-            pool_size: int = 50,
-            max_overflow: int = 10,
+        self,
+        url: str,
+        echo: bool = False,
+        echo_pool: bool = False,
+        pool_size: int = 50,
+        max_overflow: int = 10,
     ):
         self.engine: AsyncEngine = create_async_engine(
             url=url,
             echo=echo,
             echo_pool=echo_pool,
             pool_size=pool_size,
-            max_overflow=max_overflow
+            max_overflow=max_overflow,
         )
         self.session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             bind=self.engine,
@@ -45,17 +43,3 @@ db_helper = DatabaseHelper(
     pool_size=settings.db.pool_size,
     max_overflow=settings.db.max_overflow,
 )
-
-
-class Base(DeclarativeBase):
-    __abstract__ = True
-
-    metadata = MetaData(
-        naming_convention=settings.db.naming_convention,
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    @declared_attr.directive
-    def __tablename__(cls) -> str:
-        return cls.__name__.lower()
