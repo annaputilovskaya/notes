@@ -1,8 +1,8 @@
-from typing import List
+from typing import List, Set
 
 from notices.models import Note, Tag
 from notices.schemas import NoteSchema, NoteUpdateSchema, TagSchema
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -29,32 +29,35 @@ def create_tag(
     return new_tag
 
 
-async def get_tag_by_name(session: AsyncSession, input_tag: TagSchema) -> Tag | None:
+async def get_tags_by_name(session: AsyncSession, names: Set[str]) -> List[Tag]:
     """
-    Получает тег по имени тега.
+    Получает теги по именам тегов.
     """
 
-    stmt = select(Tag).where(Tag.name == input_tag.name)
-    return (await session.execute(stmt)).scalar_one_or_none()
+    stmt = select(Tag).where(or_(Tag.name == name for name in names))
+    tags = await session.scalars(stmt)
+    return list(tags)
 
 
-async def get_tags_to_append(session: AsyncSession, tags: List[TagSchema]) -> Note:
+async def get_tags_to_append(session: AsyncSession, tags: List[TagSchema]) -> List[Tag]:
     """
     Получает список тегов для добавления к заметке.
     """
 
-    tags_to_append = []
     if tags:
+        names = set([tag.name for tag in tags])
+        tags_to_append = await get_tags_by_name(session, names)
+        found_names = [tag.name for tag in tags_to_append if tags_to_append]
         for tag in tags:
-            new_tag = await get_tag_by_name(session=session, input_tag=tag)
-            if new_tag is None:
+            if tag.name not in found_names:
                 new_tag = create_tag(tag=tag)
-            session.add(new_tag)
-            await session.commit()
-            await session.refresh(new_tag)
-            tags_to_append.append(new_tag)
+                session.add(new_tag)
+                await session.commit()
+                await session.refresh(new_tag)
+                tags_to_append.append(new_tag)
 
-    return tags_to_append
+        return tags_to_append
+    return []
 
 
 async def add_note(
@@ -65,12 +68,12 @@ async def add_note(
     Добавляет заметку с тегами в базу данных.
     """
 
+    tags = await get_tags_to_append(session=session, tags=note_in.tags)
     new_note = create_note(note_in)
     session.add(new_note)
     await session.commit()
     await session.refresh(new_note)
     note = await get_note(session=session, note_id=new_note.id)
-    tags = await get_tags_to_append(session=session, tags=note_in.tags)
     note.tags += tags
     await session.commit()
     return note
