@@ -1,12 +1,14 @@
 from datetime import datetime
-from typing import Annotated, List
+from typing import List
 
 from core.base import Base
 from sqlalchemy import ForeignKey, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from core.mixins.id_int_pk_mixin import IdIntPkMixin
 
-class NoteTagAssociation(Base):
+
+class NoteTagAssociation(Base, IdIntPkMixin):
     """
     Модель взаимосвязи заметки с тегами в базе данных.
     """
@@ -16,14 +18,13 @@ class NoteTagAssociation(Base):
         UniqueConstraint("note_id", "tag_id", name="idx_unique_note_tag"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     note_id: Mapped[int] = mapped_column(
         ForeignKey("note.id", ondelete="CASCADE"),
     )
     tag_id: Mapped[int] = mapped_column(ForeignKey("tag.id", ondelete="CASCADE"))
 
 
-class Note(Base):
+class Note(Base, IdIntPkMixin):
     """
     Модель заметки для отображения в базе данных.
     """
@@ -46,7 +47,7 @@ class Note(Base):
         return f"{self.__class__.__name__}({self.id=}, {self.title=}, {self.tags=})"
 
 
-class Tag(Base):
+class Tag(Base, IdIntPkMixin):
     """
     Модель тега заметки для отображения в базе данных.
     """
