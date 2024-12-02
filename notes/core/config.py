@@ -1,5 +1,13 @@
-from pydantic import BaseModel, PostgresDsn
+from pathlib import Path
+
+
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.config import Config
+
+BASE_DIR = Path(__file__).parent.parent
+
+config = Config(".env")
 
 
 class RunConfig(BaseModel):
@@ -8,27 +16,33 @@ class RunConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    url: PostgresDsn
-    echo: bool = False
+    DB_ENGINE: str = config("DB_ENGINE")
+    DB_USER: str = config("DB_USER")
+    DB_PASSWORD: str = config("DB_PASSWORD")
+    DB_HOST: str = config("DB_HOST")
+    DB_PORT: str = config("DB_PORT")
+    DB_NAME: str = config("DB_NAME")
+    url: str = f"{DB_ENGINE}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    echo: bool = bool(int(config("DB_ECHO")))
     echo_pool: bool = False
     pool_size: int = 50
     max_overflow: int = 10
 
-    # naming_convention: dict[str, str] = {
-    #     "ix": "ix_%(column_0_label)s",
-    #     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
-    #     "ck": "ck_%(table_name)s_%(constraint_name)s",
-    #     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    #     "pk": "pk_%(table_name)s",
-    # }
+
+class AuthJWT(BaseModel):
+    lifetime_seconds: int = 3600
+    private_key_path: Path = BASE_DIR / "certs" / "jwt-private.pem"
+    public_key_path: Path = BASE_DIR / "certs" / "jwt-public.pem"
+    algorithm: str = config("ALGORITHM")
+    reset_password_token_secret: str = config("RESET_PASSWORD_TOKEN_SECRET")
+    verification_token_secret: str = config("VERIFICATION_TOKEN_SECRET")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        case_sensitive=False, env_nested_delimiter="__", env_file=".env"
-    )
+    model_config = SettingsConfigDict(extra="ignore")
     run: RunConfig = RunConfig()
-    db: DatabaseConfig
+    db: DatabaseConfig = DatabaseConfig()
+    auth_jwt: AuthJWT = AuthJWT()
 
 
 settings = Settings()
