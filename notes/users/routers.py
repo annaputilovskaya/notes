@@ -23,7 +23,10 @@ router = APIRouter(
 # /login
 # /logout
 router.include_router(
-    fastapi_users.get_auth_router(authentication_backend),
+    fastapi_users.get_auth_router(
+        authentication_backend,
+        requires_verification=True,
+    ),
 )
 # /register
 router.include_router(
