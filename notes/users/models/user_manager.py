@@ -30,7 +30,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         request: Request | None = None,
     ):
         log.warning(
-            "Verification requested for user %s. Verification token: %s",
+            "User %s has forgot their password. Reset token: %s",
             user.id,
             token,
         )
@@ -42,7 +42,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         request: Request | None = None,
     ):
         log.warning(
-            "User %s has forgot their password. Reset token: %s",
+            "Verification requested for user %s. Verification token: %s",
             user.id,
             token,
         )
