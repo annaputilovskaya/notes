@@ -39,6 +39,7 @@ class Note(Base, IdIntPkMixin):
         secondary="note_tag_association",
         back_populates="notes",
     )
+    owner: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
 
     def __str__(self):
         return f"{self.title}"
