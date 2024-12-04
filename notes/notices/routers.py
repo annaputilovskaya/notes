@@ -1,12 +1,22 @@
-from core.database import db_helper
+from fastapi.security import HTTPBearer
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import db_helper
 from notices import crud
 from notices.dependencies import note_by_id
 from notices.models import Note
 from notices.schemas import NoteDetailSchema, NoteSchema, NoteUpdateSchema
-from sqlalchemy.ext.asyncio import AsyncSession
+from users.dependencies import current_active_verified_user
+from users.models.user import User
 
-router = APIRouter(prefix="/notes", tags=["Заметки"])
+http_bearer = HTTPBearer(auto_error=False)
+
+router = APIRouter(
+    prefix="/notes",
+    tags=["Заметки"],
+    dependencies=[Depends(http_bearer)],
+)
 
 
 @router.post(
@@ -18,20 +28,26 @@ router = APIRouter(prefix="/notes", tags=["Заметки"])
 async def create_note(
     note: NoteSchema,
     session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(current_active_verified_user),
 ):
-    return await crud.add_note(note_in=note, session=session)
+    return await crud.add_note(note_in=note, session=session, user=user)
 
 
 @router.get("", summary="Все заметки", response_model=list[NoteDetailSchema])
-async def get_notes(session: AsyncSession = Depends(db_helper.session_getter)):
-    return await crud.get_all_notes(session=session)
+async def get_notes(
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(current_active_verified_user),
+):
+    return await crud.get_all_notes(session=session, user=user)
 
 
 @router.get("/tag", summary="Заметки по тегу", response_model=list[NoteDetailSchema])
 async def get_notes_by_tag(
-    tag: str, session: AsyncSession = Depends(db_helper.session_getter)
+    tag: str,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    user: User = Depends(current_active_verified_user),
 ):
-    return await crud.get_notes_by_tag(session=session, input_tag=tag)
+    return await crud.get_notes_by_tag(session=session, input_tag=tag, user=user)
 
 
 @router.get("/{note_id}", summary="Заметка по id", response_model=NoteDetailSchema)

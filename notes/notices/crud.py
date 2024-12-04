@@ -1,20 +1,20 @@
 from typing import List, Set
 
-from notices.models import Note, Tag
-from notices.schemas import NoteSchema, NoteUpdateSchema, TagSchema
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from notices.models import Note, Tag
+from notices.schemas import NoteSchema, NoteUpdateSchema, TagSchema
+from users.models.user import User
 
-def create_note(
-    note: NoteSchema,
-) -> Note:
+
+def create_note(note: NoteSchema, user_id: int) -> Note:
     """
     Создает заметку.
     """
 
-    new_note = Note(title=note.title, text=note.text)
+    new_note = Note(title=note.title, text=note.text, owner=user_id)
     return new_note
 
 
@@ -60,67 +60,97 @@ async def get_tags_to_append(session: AsyncSession, tags: List[TagSchema]) -> Li
     return []
 
 
-async def add_note(
-    session: AsyncSession,
-    note_in: NoteSchema,
-) -> Note:
+async def add_note(session: AsyncSession, note_in: NoteSchema, user: User) -> Note:
     """
     Добавляет заметку с тегами в базу данных.
     """
 
     tags = await get_tags_to_append(session=session, tags=note_in.tags)
-    new_note = create_note(note_in)
+    new_note = create_note(note_in, user.id)
     session.add(new_note)
     await session.commit()
     await session.refresh(new_note)
-    note = await get_note(session=session, note_id=new_note.id)
+    note = await get_note(session=session, note_id=new_note.id, user=user)
     note.tags += tags
     await session.commit()
     return note
 
 
-async def get_all_notes(session: AsyncSession) -> list[Note]:
+async def get_all_notes(session: AsyncSession, user: User) -> list[Note]:
     """
-    Получает информацию о всех заметках вместе с информацией о тегах.
+    Получает информацию о всех заметках пользователя вместе с информацией о тегах.
+    Получает информацию о всех заметках всех пользователей вместе с информацией о тегах,
+    если пользователь имеет права администратора.
     """
 
-    stmt = (
-        select(Note)
-        .options(
-            selectinload(Note.tags),
+    if user.is_superuser:
+        stmt = (
+            select(Note)
+            .options(
+                selectinload(Note.tags),
+            )
+            .order_by(Note.id)
         )
-        .order_by(Note.id)
-    )
+    else:
+        stmt = (
+            select(Note)
+            .where(Note.owner == user.id)
+            .options(
+                selectinload(Note.tags),
+            )
+            .order_by(Note.id)
+        )
+
     notes = await session.scalars(stmt)
 
     return list(notes)
 
 
-async def get_note(session: AsyncSession, note_id: int) -> Note | None:
+async def get_note(session: AsyncSession, note_id: int, user: User) -> Note | None:
     """
     Получает информацию о заметке по ее идентификатору вместе с информацией о тегах.
     """
-
+    if user.is_superuser:
+        return await session.scalar(
+            select(Note)
+            .where(Note.id == note_id)
+            .options(
+                selectinload(Note.tags),
+            ),
+        )
     return await session.scalar(
         select(Note)
-        .where(Note.id == note_id)
+        .where(Note.id == note_id, Note.owner == user.id)
         .options(
             selectinload(Note.tags),
         ),
     )
 
 
-async def get_notes_by_tag(session: AsyncSession, input_tag: str) -> list[Note]:
+async def get_notes_by_tag(
+    session: AsyncSession, input_tag: str, user: User
+) -> list[Note]:
     """
-    Получает информацию о заметках, содержащих определенный тег.
+    Получает информацию о заметках пользователя, содержащих определенный тег.
+    Получает информацию о заметках всех пользователей, содержащих определенный тег,
+    если пользователь имеет права администратора.
     """
+    if user.is_superuser:
+        stmt = (
+            select(Note)
+            .join(Note.tags)
+            .options(selectinload(Note.tags))
+            .where(Tag.name == input_tag)
+        )
+    else:
+        stmt = (
+            select(Note)
+            .where(Note.owner == user.id)
+            .join(Note.tags)
+            .options(selectinload(Note.tags))
+            .where(Tag.name == input_tag)
+        )
 
-    stmt = (
-        select(Note)
-        .join(Note.tags)
-        .options(selectinload(Note.tags))
-        .where(Tag.name == input_tag)
-    )
     notes = await session.scalars(stmt)
     return list(notes)
 
