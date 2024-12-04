@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import List
 
-from core.base import Base
 from sqlalchemy import ForeignKey, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from core.base import Base
 from core.mixins.id_int_pk_mixin import IdIntPkMixin
 
 
